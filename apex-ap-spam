@@ -1,0 +1,409 @@
+-- Services
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ApexHubGui"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- ==========================================
+-- 1. DEVICE SELECTOR
+-- ==========================================
+local DeviceSelectorGui = Instance.new("Frame")
+DeviceSelectorGui.Name = "DeviceSelector"
+DeviceSelectorGui.Size = UDim2.new(0, 300, 0, 270)
+DeviceSelectorGui.Position = UDim2.new(0.5, -150, 0.5, -135)
+DeviceSelectorGui.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+DeviceSelectorGui.BorderSizePixel = 0
+DeviceSelectorGui.Active = true
+DeviceSelectorGui.Draggable = true
+DeviceSelectorGui.Parent = ScreenGui
+
+local dsCorner = Instance.new("UICorner", DeviceSelectorGui)
+dsCorner.CornerRadius = UDim.new(0, 10)
+
+local dsStroke = Instance.new("UIStroke", DeviceSelectorGui)
+dsStroke.Color = Color3.fromRGB(50, 50, 65)
+dsStroke.Thickness = 1.5
+
+local dsTitle = Instance.new("TextLabel", DeviceSelectorGui)
+dsTitle.Size = UDim2.new(1, 0, 0, 40)
+dsTitle.BackgroundTransparency = 1
+dsTitle.Text = "Choose Your Device"
+dsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+dsTitle.TextSize = 16
+dsTitle.Font = Enum.Font.GothamBold
+
+local dsWarning = Instance.new("TextLabel", DeviceSelectorGui)
+dsWarning.Size = UDim2.new(1, -20, 0, 60)
+dsWarning.Position = UDim2.new(0, 10, 0, 42)
+dsWarning.BackgroundTransparency = 1
+dsWarning.Text = "Warning: Choosing the wrong device will mess up your menu\nRejoin if you select the wrong device"
+dsWarning.TextColor3 = Color3.fromRGB(255, 80, 80)
+dsWarning.TextSize = 10
+dsWarning.Font = Enum.Font.GothamMedium
+dsWarning.TextWrapped = true
+
+local dsListLayout = Instance.new("UIListLayout", DeviceSelectorGui)
+dsListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+dsListLayout.Padding = UDim.new(0, 6)
+dsListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local spacer = Instance.new("Frame", DeviceSelectorGui)
+spacer.Size = UDim2.new(1, 0, 0, 95)
+spacer.BackgroundTransparency = 1
+spacer.LayoutOrder = 1
+
+local MainFrame, ScrollingFrame, TopBar, ToggleButton
+
+-- ==========================================
+-- 2. OVERHEAD BILLBOARDGUI
+-- ==========================================
+local function setupOverhead(character)
+	local head = character:WaitForChild("Head", 5)
+	if not head then return end
+
+	if head:FindFirstChild("ApexOverhead") then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ApexOverhead"
+	billboard.Size = UDim2.new(0, 100, 0, 30)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = head
+	billboard.Parent = head
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = character.Name
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.TextSize = 12
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Parent = billboard
+
+	local uiStroke = Instance.new("UIStroke")
+	uiStroke.Color = Color3.fromRGB(0, 0, 0)
+	uiStroke.Thickness = 2
+	uiStroke.Parent = textLabel
+end
+
+local function onPlayerAdded(player)
+	player.CharacterAdded:Connect(setupOverhead)
+	if player.Character then
+		setupOverhead(player.Character)
+	end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, player in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(player)
+end
+
+-- ==========================================
+-- 3. SICHERES CHAT-SYSTEM
+-- ==========================================
+local function sendCommand(cmd, playerName)
+	local message = string.format(";%s %s", cmd, playerName)
+	
+	local success = pcall(function()
+		local channels = TextChatService:FindFirstChild("TextChannels")
+		if channels and channels:FindFirstChild("RBXGeneral") then
+			channels.RBXGeneral:SendAsync(message)
+			return true
+		end
+		return false
+	end)
+
+	if not success then
+		pcall(function()
+			local events = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+			if events then
+				events.SayMessageRequest:FireServer(message, "All")
+			end
+		end)
+	end
+end
+
+-- ==========================================
+-- 4. MAIN HUB ERSTELLEN
+-- ==========================================
+function loadMainHub(scale)
+	-- Etwas breiter gemacht (660px), damit alle 6 Buttons (inkl. AP-SPAM) perfekt reinpassen
+	local uiWidth = math.floor(660 * scale)
+	local uiHeight = math.floor(340 * scale)
+
+	MainFrame = Instance.new("Frame")
+	MainFrame.Name = "MainFrame"
+	MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
+	MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -uiHeight/2)
+	MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	MainFrame.BorderSizePixel = 0
+	MainFrame.Parent = ScreenGui
+
+	local mainCorner = Instance.new("UICorner", MainFrame)
+	mainCorner.CornerRadius = UDim.new(0, 8)
+
+	local mainStroke = Instance.new("UIStroke", MainFrame)
+	mainStroke.Color = Color3.fromRGB(50, 50, 65)
+	mainStroke.Thickness = 1.5
+
+	TopBar = Instance.new("Frame")
+	TopBar.Name = "TopBar"
+	TopBar.Size = UDim2.new(1, 0, 0, 35)
+	TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	TopBar.BorderSizePixel = 0
+	TopBar.Parent = MainFrame
+
+	local topCorner = Instance.new("UICorner", TopBar)
+	topCorner.CornerRadius = UDim.new(0, 8)
+
+	-- Eckkanten-Fix unten im TopBar
+	local fixFrame = Instance.new("Frame", TopBar)
+	fixFrame.Size = UDim2.new(1, 0, 0, 8)
+	fixFrame.Position = UDim2.new(0, 0, 1, -8)
+	fixFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	fixFrame.BorderSizePixel = 0
+
+	local title = Instance.new("TextLabel", TopBar)
+	title.Size = UDim2.new(1, -50, 1, 0)
+	title.Position = UDim2.new(0, 15, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = "APEX HUB"
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextSize = math.floor(16 * scale)
+	title.Font = Enum.Font.GothamBold
+	title.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- ==========================================
+	-- RUNDER LOGO TOGGLE-BUTTON (Draggable, Ohne Rand)
+	-- ==========================================
+	ToggleButton = Instance.new("ImageButton", ScreenGui)
+	ToggleButton.Name = "ApexToggleButton"
+	ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+	ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
+	ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	ToggleButton.Image = "rbxassetid://123645319057555" -- Deine Textur-ID
+	ToggleButton.Visible = false
+	ToggleButton.Active = true
+	ToggleButton.Draggable = true -- Vollständig verschiebbar!
+
+	local tbCorner = Instance.new("UICorner", ToggleButton)
+	tbCorner.CornerRadius = UDim.new(1, 0) -- Macht den Button rund
+
+	-- (Kein UIStroke/Rand hier, wie gewünscht entfernt!)
+
+	-- ==========================================
+	-- X-BUTTON (Schließen mit Animation)
+	-- ==========================================
+	local closeBtn = Instance.new("TextButton", TopBar)
+	closeBtn.Size = UDim2.new(0, 28, 0, 28)
+	closeBtn.Position = UDim2.new(1, -34, 0, 3.5)
+	closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	closeBtn.Text = "X"
+	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeBtn.TextSize = 14
+	closeBtn.Font = Enum.Font.GothamBold
+	
+	local closeCorner = Instance.new("UICorner", closeBtn)
+	closeCorner.CornerRadius = UDim.new(0, 6)
+
+	ScrollingFrame = Instance.new("ScrollingFrame")
+	ScrollingFrame.Size = UDim2.new(1, -16, 1, -45)
+	ScrollingFrame.Position = UDim2.new(0, 8, 0, 40)
+	ScrollingFrame.BackgroundTransparency = 1
+	ScrollingFrame.BorderSizePixel = 0
+	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	ScrollingFrame.ScrollBarThickness = 4
+	ScrollingFrame.Parent = MainFrame
+
+	-- Schließen Logik (mit Tween-Animation NUR beim Schließen)
+	closeBtn.MouseButton1Click:Connect(function()
+		local closeTween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+			Size = UDim2.new(0, 0, 0, 0),
+			Position = MainFrame.Position + UDim2.new(0, uiWidth/2, 0, uiHeight/2)
+		})
+		closeTween:Play()
+		closeTween.Completed:Connect(function()
+			MainFrame.Visible = false
+			-- Reset für nächstes Öffnen
+			MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
+			MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -uiHeight/2)
+			ToggleButton.Visible = true
+		end)
+	end)
+
+	-- Wiederöffnen über das Logo-Icon
+	ToggleButton.MouseButton1Click:Connect(function()
+		ToggleButton.Visible = false
+		MainFrame.Visible = true
+	end)
+
+	local listLayout = Instance.new("UIListLayout", ScrollingFrame)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Padding = UDim.new(0, 6)
+
+	-- Draggable Logic für das Hauptfenster
+	local dragging, dragInput, dragStart, startPos
+	TopBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = MainFrame.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	TopBar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+
+	-- Spieler Zeile hinzufügen
+	local function addPlayerRow(player)
+		if player == LocalPlayer then return end
+
+		local row = Instance.new("Frame")
+		row.Name = player.Name
+		row.Size = UDim2.new(1, -4, 0, 34)
+		row.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+		row.BorderSizePixel = 0
+		row.Parent = ScrollingFrame
+
+		local rowCorner = Instance.new("UICorner", row)
+		rowCorner.CornerRadius = UDim.new(0, 5)
+
+		-- Name links
+		local nameLabel = Instance.new("TextLabel", row)
+		nameLabel.Size = UDim2.new(0, 130, 1, 0)
+		nameLabel.Position = UDim2.new(0, 8, 0, 0)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Text = player.Name
+		nameLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+		nameLabel.TextSize = 12
+		nameLabel.Font = Enum.Font.Gotham
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+		-- Button Container für exakte Passform aller 6 Buttons
+		local btnContainer = Instance.new("Frame", row)
+		btnContainer.Size = UDim2.new(1, -135, 1, 0)
+		btnContainer.Position = UDim2.new(0, 132, 0, 0)
+		btnContainer.BackgroundTransparency = 1
+		btnContainer.BorderSizePixel = 0
+
+		local btnLayout = Instance.new("UIListLayout", btnContainer)
+		btnLayout.FillDirection = Enum.FillDirection.Horizontal
+		btnLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		btnLayout.Padding = UDim.new(0, 3)
+
+		local function createButton(text, color, width)
+			local btn = Instance.new("TextButton", btnContainer)
+			btn.Size = UDim2.new(0, width, 0, 24)
+			btn.BackgroundColor3 = color
+			btn.Text = text
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.TextSize = 9
+			btn.Font = Enum.Font.GothamBold
+			
+			local corner = Instance.new("UICorner", btn)
+			corner.CornerRadius = UDim.new(0, 4)
+			return btn
+		end
+
+		-- Alle 6 Buttons passend skaliert, damit AP-SPAM garantiert sichtbar ist
+		createButton("Balloon", Color3.fromRGB(200, 50, 50), 50).MouseButton1Click:Connect(function()
+			sendCommand("balloon", player.Name)
+		end)
+
+		createButton("Jail", Color3.fromRGB(100, 100, 100), 34).MouseButton1Click:Connect(function()
+			sendCommand("jail", player.Name)
+		end)
+
+		createButton("Ragdoll", Color3.fromRGB(150, 75, 0), 52).MouseButton1Click:Connect(function()
+			sendCommand("ragdoll", player.Name)
+		end)
+
+		createButton("Rocket", Color3.fromRGB(50, 150, 200), 46).MouseButton1Click:Connect(function()
+			sendCommand("rocket", player.Name)
+		end)
+
+		createButton("Control", Color3.fromRGB(50, 200, 100), 48).MouseButton1Click:Connect(function()
+			sendCommand("control", player.Name)
+		end)
+
+		createButton("AP-SPAM", Color3.fromRGB(220, 100, 0), 54).MouseButton1Click:Connect(function()
+			local cmds = {"ragdoll", "rocket", "inverse", "balloon", "jail", "tiny", "morph", "jumpscare"}
+			task.spawn(function()
+				for _, cmd in ipairs(cmds) do
+					sendCommand(cmd, player.Name)
+					task.wait(0.1)
+				end
+			end)
+		end)
+
+		ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 40)
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		addPlayerRow(player)
+	end
+
+	Players.PlayerAdded:Connect(addPlayerRow)
+
+	Players.PlayerRemoving:Connect(function(player)
+		local row = ScrollingFrame:FindFirstChild(player.Name)
+		if row then
+			row:Destroy()
+			ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 40)
+		end
+	end)
+end
+
+-- ==========================================
+-- 5. DEVICE SELECTOR BUTTONS ERSTELLEN
+-- ==========================================
+local function createSelectorButton(name, scaleValue)
+	local btn = Instance.new("TextButton", DeviceSelectorGui)
+	btn.Size = UDim2.new(0, 260, 0, 32)
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+	btn.BorderSizePixel = 0
+	btn.Text = name
+	btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+	btn.TextSize = 12
+	btn.Font = Enum.Font.GothamBold
+	
+	local btnCorner = Instance.new("UICorner", btn)
+	btnCorner.CornerRadius = UDim.new(0, 6)
+
+	btn.MouseButton1Click:Connect(function()
+		DeviceSelectorGui:Destroy()
+		loadMainHub(scaleValue)
+	end)
+end
+
+createSelectorButton("Tablet", 0.85)
+createSelectorButton("Phone", 0.7)
+createSelectorButton("PC/Laptop", 1.0)
+
