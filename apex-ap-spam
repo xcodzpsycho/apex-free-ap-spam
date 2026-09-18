@@ -133,17 +133,19 @@ local function sendCommand(cmd, playerName)
 end
 
 -- ==========================================
--- 4. MAIN HUB ERSTELLEN
+-- 4. MAIN HUB ERSTELLEN (DYNAMISCHE HÖHE)
 -- ==========================================
 function loadMainHub(scale)
-	-- Etwas breiter gemacht (660px), damit alle 6 Buttons (inkl. AP-SPAM) perfekt reinpassen
-	local uiWidth = math.floor(660 * scale)
-	local uiHeight = math.floor(340 * scale)
+	local uiWidth = math.floor(620 * scale)
+	local rowHeight = 34
+	local padding = 6
+	local topBarHeight = 35
+	local maxVisibleRows = 5
 
 	MainFrame = Instance.new("Frame")
 	MainFrame.Name = "MainFrame"
-	MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
-	MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -uiHeight/2)
+	MainFrame.Size = UDim2.new(0, uiWidth, 0, topBarHeight + 10)
+	MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -75)
 	MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.Parent = ScreenGui
@@ -157,15 +159,15 @@ function loadMainHub(scale)
 
 	TopBar = Instance.new("Frame")
 	TopBar.Name = "TopBar"
-	TopBar.Size = UDim2.new(1, 0, 0, 35)
+	TopBar.Size = UDim2.new(1, 0, 0, topBarHeight)
 	TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	TopBar.BorderSizePixel = 0
+	TopBar.ZIndex = 2
 	TopBar.Parent = MainFrame
 
 	local topCorner = Instance.new("UICorner", TopBar)
 	topCorner.CornerRadius = UDim.new(0, 8)
 
-	-- Eckkanten-Fix unten im TopBar
 	local fixFrame = Instance.new("Frame", TopBar)
 	fixFrame.Size = UDim2.new(1, 0, 0, 8)
 	fixFrame.Position = UDim2.new(0, 0, 1, -8)
@@ -176,66 +178,88 @@ function loadMainHub(scale)
 	title.Size = UDim2.new(1, -50, 1, 0)
 	title.Position = UDim2.new(0, 15, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "APEX HUB"
+	title.Text = "APEX HUB AP SPAM"
 	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.TextSize = math.floor(16 * scale)
+	title.TextSize = math.floor(15 * scale)
 	title.Font = Enum.Font.GothamBold
 	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.ZIndex = 3
 
 	-- ==========================================
 	-- RUNDER LOGO TOGGLE-BUTTON (Draggable, Ohne Rand)
 	-- ==========================================
 	ToggleButton = Instance.new("ImageButton", ScreenGui)
 	ToggleButton.Name = "ApexToggleButton"
-	ToggleButton.Size = UDim2.new(0, 50, 0, 50)
-	ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
+	ToggleButton.Size = UDim2.new(0, 45, 0, 45)
+	ToggleButton.Position = UDim2.new(0, 20, 0.5, -22)
 	ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-	ToggleButton.Image = "rbxassetid://123645319057555" -- Deine Textur-ID
+	ToggleButton.Image = "rbxassetid://123645319057555"
 	ToggleButton.Visible = false
 	ToggleButton.Active = true
-	ToggleButton.Draggable = true -- Vollständig verschiebbar!
+	ToggleButton.Draggable = true
 
 	local tbCorner = Instance.new("UICorner", ToggleButton)
-	tbCorner.CornerRadius = UDim.new(1, 0) -- Macht den Button rund
-
-	-- (Kein UIStroke/Rand hier, wie gewünscht entfernt!)
+	tbCorner.CornerRadius = UDim.new(1, 0)
 
 	-- ==========================================
-	-- X-BUTTON (Schließen mit Animation)
+	-- X-BUTTON (Fix: ZIndex ganz nach oben gesetzt)
 	-- ==========================================
 	local closeBtn = Instance.new("TextButton", TopBar)
-	closeBtn.Size = UDim2.new(0, 28, 0, 28)
-	closeBtn.Position = UDim2.new(1, -34, 0, 3.5)
+	closeBtn.Size = UDim2.new(0, 26, 0, 26)
+	closeBtn.Position = UDim2.new(1, -32, 0, 4.5)
 	closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 	closeBtn.Text = "X"
 	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	closeBtn.TextSize = 14
+	closeBtn.TextSize = 13
 	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.ZIndex = 5
 	
 	local closeCorner = Instance.new("UICorner", closeBtn)
 	closeCorner.CornerRadius = UDim.new(0, 6)
 
 	ScrollingFrame = Instance.new("ScrollingFrame")
-	ScrollingFrame.Size = UDim2.new(1, -16, 1, -45)
-	ScrollingFrame.Position = UDim2.new(0, 8, 0, 40)
+	ScrollingFrame.Size = UDim2.new(1, -16, 1, -43)
+	ScrollingFrame.Position = UDim2.new(0, 8, 0, 38)
 	ScrollingFrame.BackgroundTransparency = 1
 	ScrollingFrame.BorderSizePixel = 0
 	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 	ScrollingFrame.ScrollBarThickness = 4
+	ScrollingFrame.ZIndex = 1
 	ScrollingFrame.Parent = MainFrame
+
+	local listLayout = Instance.new("UIListLayout", ScrollingFrame)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Padding = UDim.new(0, padding)
+
+	-- Funktion zur automatischen Anpassung der UI-Größe basierend auf Spielern
+	local function updateWindowSize()
+		local activePlayers = 0
+		for _, child in ipairs(ScrollingFrame:GetChildren()) do
+			if child:IsA("Frame") then
+				activePlayers = activePlayers + 1
+			end
+		end
+
+		local visibleRows = math.clamp(activePlayers, 1, maxVisibleRows)
+		local contentHeight = (visibleRows * rowHeight) + ((visibleRows - 1) * padding) + 12
+		local targetHeight = topBarHeight + contentHeight
+
+		MainFrame.Size = UDim2.new(0, uiWidth, 0, targetHeight)
+		ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, (activePlayers * rowHeight) + ((activePlayers - 1) * padding))
+	end
 
 	-- Schließen Logik (mit Tween-Animation NUR beim Schließen)
 	closeBtn.MouseButton1Click:Connect(function()
+		local currentSize = MainFrame.Size
 		local closeTween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
 			Size = UDim2.new(0, 0, 0, 0),
-			Position = MainFrame.Position + UDim2.new(0, uiWidth/2, 0, uiHeight/2)
+			Position = MainFrame.Position + UDim2.new(0, uiWidth/2, 0, MainFrame.AbsoluteSize.Y/2)
 		})
 		closeTween:Play()
 		closeTween.Completed:Connect(function()
 			MainFrame.Visible = false
-			-- Reset für nächstes Öffnen
-			MainFrame.Size = UDim2.new(0, uiWidth, 0, uiHeight)
-			MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -uiHeight/2)
+			MainFrame.Size = currentSize
+			MainFrame.Position = UDim2.new(0.5, -uiWidth/2, 0.5, -currentSize.Y.Offset/2)
 			ToggleButton.Visible = true
 		end)
 	end)
@@ -246,12 +270,9 @@ function loadMainHub(scale)
 		MainFrame.Visible = true
 	end)
 
-	local listLayout = Instance.new("UIListLayout", ScrollingFrame)
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Padding = UDim.new(0, 6)
-
-	-- Draggable Logic für das Hauptfenster
+	-- PC-Drag-Logik
 	local dragging, dragInput, dragStart, startPos
+
 	TopBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
@@ -267,7 +288,7 @@ function loadMainHub(scale)
 	end)
 
 	TopBar.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			dragInput = input
 		end
 	end)
@@ -275,7 +296,12 @@ function loadMainHub(scale)
 	UserInputService.InputChanged:Connect(function(input)
 		if input == dragInput and dragging then
 			local delta = input.Position - dragStart
-			MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			MainFrame.Position = UDim2.new(
+				startPos.X.Scale, 
+				startPos.X.Offset + delta.X, 
+				startPos.Y.Scale, 
+				startPos.Y.Offset + delta.Y
+			)
 		end
 	end)
 
@@ -285,32 +311,33 @@ function loadMainHub(scale)
 
 		local row = Instance.new("Frame")
 		row.Name = player.Name
-		row.Size = UDim2.new(1, -4, 0, 34)
+		row.Size = UDim2.new(1, -4, 0, rowHeight)
 		row.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 		row.BorderSizePixel = 0
+		row.ZIndex = 2
 		row.Parent = ScrollingFrame
 
 		local rowCorner = Instance.new("UICorner", row)
 		rowCorner.CornerRadius = UDim.new(0, 5)
 
-		-- Name links
 		local nameLabel = Instance.new("TextLabel", row)
-		nameLabel.Size = UDim2.new(0, 130, 1, 0)
+		nameLabel.Size = UDim2.new(0, 125, 1, 0)
 		nameLabel.Position = UDim2.new(0, 8, 0, 0)
 		nameLabel.BackgroundTransparency = 1
 		nameLabel.Text = player.Name
 		nameLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
-		nameLabel.TextSize = 12
+		nameLabel.TextSize = 11
 		nameLabel.Font = Enum.Font.Gotham
 		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 		nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		nameLabel.ZIndex = 2
 
-		-- Button Container für exakte Passform aller 6 Buttons
 		local btnContainer = Instance.new("Frame", row)
-		btnContainer.Size = UDim2.new(1, -135, 1, 0)
-		btnContainer.Position = UDim2.new(0, 132, 0, 0)
+		btnContainer.Size = UDim2.new(1, -130, 1, 0)
+		btnContainer.Position = UDim2.new(0, 125, 0, 0)
 		btnContainer.BackgroundTransparency = 1
 		btnContainer.BorderSizePixel = 0
+		btnContainer.ZIndex = 2
 
 		local btnLayout = Instance.new("UIListLayout", btnContainer)
 		btnLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -320,40 +347,40 @@ function loadMainHub(scale)
 
 		local function createButton(text, color, width)
 			local btn = Instance.new("TextButton", btnContainer)
-			btn.Size = UDim2.new(0, width, 0, 24)
+			btn.Size = UDim2.new(0, width, 0, 22)
 			btn.BackgroundColor3 = color
 			btn.Text = text
 			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			btn.TextSize = 9
+			btn.TextSize = 8.5
 			btn.Font = Enum.Font.GothamBold
+			btn.ZIndex = 3
 			
 			local corner = Instance.new("UICorner", btn)
 			corner.CornerRadius = UDim.new(0, 4)
 			return btn
 		end
 
-		-- Alle 6 Buttons passend skaliert, damit AP-SPAM garantiert sichtbar ist
-		createButton("Balloon", Color3.fromRGB(200, 50, 50), 50).MouseButton1Click:Connect(function()
+		createButton("Balloon", Color3.fromRGB(200, 50, 50), 48).MouseButton1Click:Connect(function()
 			sendCommand("balloon", player.Name)
 		end)
 
-		createButton("Jail", Color3.fromRGB(100, 100, 100), 34).MouseButton1Click:Connect(function()
+		createButton("Jail", Color3.fromRGB(100, 100, 100), 32).MouseButton1Click:Connect(function()
 			sendCommand("jail", player.Name)
 		end)
 
-		createButton("Ragdoll", Color3.fromRGB(150, 75, 0), 52).MouseButton1Click:Connect(function()
+		createButton("Ragdoll", Color3.fromRGB(150, 75, 0), 48).MouseButton1Click:Connect(function()
 			sendCommand("ragdoll", player.Name)
 		end)
 
-		createButton("Rocket", Color3.fromRGB(50, 150, 200), 46).MouseButton1Click:Connect(function()
+		createButton("Rocket", Color3.fromRGB(50, 150, 200), 44).MouseButton1Click:Connect(function()
 			sendCommand("rocket", player.Name)
 		end)
 
-		createButton("Control", Color3.fromRGB(50, 200, 100), 48).MouseButton1Click:Connect(function()
+		createButton("Control", Color3.fromRGB(50, 200, 100), 46).MouseButton1Click:Connect(function()
 			sendCommand("control", player.Name)
 		end)
 
-		createButton("AP-SPAM", Color3.fromRGB(220, 100, 0), 54).MouseButton1Click:Connect(function()
+		createButton("AP-SPAM", Color3.fromRGB(220, 100, 0), 50).MouseButton1Click:Connect(function()
 			local cmds = {"ragdoll", "rocket", "inverse", "balloon", "jail", "tiny", "morph", "jumpscare"}
 			task.spawn(function()
 				for _, cmd in ipairs(cmds) do
@@ -363,7 +390,7 @@ function loadMainHub(scale)
 			end)
 		end)
 
-		ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 40)
+		updateWindowSize()
 	end
 
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -376,7 +403,7 @@ function loadMainHub(scale)
 		local row = ScrollingFrame:FindFirstChild(player.Name)
 		if row then
 			row:Destroy()
-			ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 40)
+			updateWindowSize()
 		end
 	end)
 end
@@ -403,7 +430,6 @@ local function createSelectorButton(name, scaleValue)
 	end)
 end
 
-createSelectorButton("Tablet", 0.85)
-createSelectorButton("Phone", 0.7)
-createSelectorButton("PC/Laptop", 1.0)
-
+createSelectorButton("Tablet", 0.75)
+createSelectorButton("Phone", 0.65)
+createSelectorButton("PC/Laptop", 0.7)
